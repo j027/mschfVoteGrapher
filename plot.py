@@ -46,8 +46,8 @@ save_interval = 600   # Save graph every 10 minutes
 
 while True:
     current_time = datetime.now()
-    
-    # Reset the graph at 00:00 of every hour
+
+    # Reset the graph and data storage at the start of a new hour
     if current_time.minute == 0 and current_time.second == 0:
         print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S')} - Resetting data for the new hour...")
         data_dict = {}
@@ -61,10 +61,12 @@ while True:
             username = player.get('username')
             score = player.get('score')
             if username and score is not None:
-                if username not in data_dict:
-                    data_dict[username] = {'time': [], 'score': []}
-                data_dict[username]['time'].append(current_time)
-                data_dict[username]['score'].append(score)
+                # Add data only if there's a change in score
+                if username not in data_dict or (data_dict[username]['score'] and score != data_dict[username]['score'][-1]):
+                    if username not in data_dict:
+                        data_dict[username] = {'time': [], 'score': []}
+                    data_dict[username]['time'].append(current_time)
+                    data_dict[username]['score'].append(score)
     else:
         print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S')} - No valid player data found.")
     
@@ -76,7 +78,13 @@ while True:
         sorted_players = sorted(data_dict.items(), key=lambda x: x[1]['score'][-1], reverse=True)[:50]
 
         for username, values in sorted_players:
-            fig.add_trace(go.Scatter(x=values['time'], y=values['score'], mode='lines+markers', name=username))
+            fig.add_trace(go.Scatter(
+                x=values['time'], 
+                y=values['score'], 
+                mode='lines+markers', 
+                line_shape='hv',  # Use horizontal-vertical steps for accurate jumps
+                name=username
+            ))
         
         fig.update_layout(
             title='Top 50 Player Scores Over Time',
