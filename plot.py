@@ -2,9 +2,19 @@ import httpx
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import time
+from fake_useragent import UserAgent
+import logging
+
+# Set up logging configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 # Initialize an HTTPX client with HTTP/2 support
 client = httpx.Client(http2=True)
+user_agent = UserAgent()  # Initialize UserAgent object
 
 # Function to fetch data from the endpoint with added timeout and retry logic
 def fetch_data(max_retries=3, retry_delay=2):
@@ -15,28 +25,29 @@ def fetch_data(max_retries=3, retry_delay=2):
         'startIndex': 0,
         'reversed': 'true'
     }
+
     for attempt in range(max_retries):
         try:
-            current_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-            print(f"{current_timestamp} - Attempting to fetch data (Attempt {attempt + 1})...")
+            headers = {'User-Agent': user_agent.random}  # Set a random user agent
             start_time = time.time()
-            response = client.get(url, params=params, timeout=5.0)  # Use client for the GET request
+            logging.info(f"Attempting to fetch data (Attempt {attempt + 1})...")
+            response = client.get(url, params=params, headers=headers, timeout=5.0)  # Include headers in the request
             response.raise_for_status()  # Raise an error for bad status codes
             duration = time.time() - start_time
-            print(f"{current_timestamp} - Data fetched successfully in {duration:.2f} seconds")
+            logging.info(f"Data fetched successfully in {duration:.2f} seconds")
             try:
                 data = response.json()
                 return data
             except ValueError:
-                print(f"{current_timestamp} - Error parsing JSON!")
+                logging.error("Error parsing JSON!")
                 return None
         except httpx.RequestError as e:
-            print(f"{current_timestamp} - Error fetching data: {e}")
+            logging.error(f"Error fetching data: {e}")
             if attempt < max_retries - 1:
-                print(f"{current_timestamp} - Retrying in {retry_delay} seconds...")
+                logging.info(f"Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
             else:
-                print(f"{current_timestamp} - Max retries reached. Skipping this fetch.")
+                logging.error("Max retries reached. Skipping this fetch.")
                 return None
 
 # Initialize variables
@@ -78,15 +89,15 @@ try:
             # Save the interactive HTML graph
             html_file_name = f'player_scores_{current_time.strftime("%Y%m%d_%H%M%S")}.html'
             fig.write_html(html_file_name)
-            print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S.%f')} - Graph saved as {html_file_name}")
+            logging.info(f"Graph saved as {html_file_name}")
 
             # Save the graph as a static PNG image as a fallback
             png_file_name = f'player_scores_{current_time.strftime("%Y%m%d_%H%M%S")}.png'
             fig.write_image(png_file_name, format='png')
-            print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S.%f')} - Graph saved as {png_file_name}")
+            logging.info(f"Graph saved as {png_file_name}")
 
             # Reset the data for the new round
-            print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S.%f')} - Resetting data for the new hour...")
+            logging.info("Resetting data for the new hour...")
             data_dict = {}
 
             # Calculate the end of the next hour
@@ -109,7 +120,7 @@ try:
                         data_dict[username]['time'].append(current_time)
                         data_dict[username]['score'].append(score)
         else:
-            print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S.%f')} - No valid player data found.")
+            logging.warning("No valid player data found.")
         
         # Wait for the next fetch
         time.sleep(fetch_interval)
