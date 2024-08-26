@@ -92,7 +92,7 @@ def load_state():
     return None
 
 # Initialize variables
-fetch_interval = 0.4
+fetch_interval = 0.5
 
 # Calculate the end of the current hour
 current_time = datetime.now()
