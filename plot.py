@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 import time
 from fake_useragent import UserAgent
 import logging
-import pickle
+import json
 import os
+import pickle
 
 # Set up logging configuration with milliseconds
 logging.basicConfig(
@@ -19,7 +20,8 @@ client = httpx.Client(http2=True)
 user_agent = UserAgent()  # Initialize UserAgent object
 
 # File to save state
-STATE_FILE = 'leaderboard_state.pkl'
+JSON_STATE_FILE = 'leaderboard_state.json'
+PICKLE_STATE_FILE = 'leaderboard_state.pkl'
 
 # Function to fetch data from the endpoint with added timeout and retry logic
 def fetch_data(max_retries=3, retry_delay=2):
@@ -72,22 +74,47 @@ def fetch_data(max_retries=3, retry_delay=2):
                 logging.error("Max retries reached. Skipping this fetch.")
                 return None
 
-# Function to save the current state to a file
+# Function to save the current state to a JSON file
 def save_state(data_dict, end_of_hour):
+    # Ensure end_of_hour is a datetime object before converting
+    if isinstance(end_of_hour, datetime):
+        end_of_hour_str = end_of_hour.isoformat()
+    else:
+        end_of_hour_str = end_of_hour  # Already a string
+    
+    # Convert datetime objects in data_dict to ISO format for JSON serialization
     state = {
-        'data_dict': data_dict,
-        'end_of_hour': end_of_hour
+        'data_dict': {k: {'time': [t.isoformat() if isinstance(t, datetime) else t for t in v['time']], 'score': v['score']} for k, v in data_dict.items()},
+        'end_of_hour': end_of_hour_str
     }
-    with open(STATE_FILE, 'wb') as f:
-        pickle.dump(state, f)
-    logging.info("State saved to file.")
+    with open(JSON_STATE_FILE, 'w') as f:
+        json.dump(state, f, indent=4)
+    logging.info("State saved to JSON file.")
 
-# Function to load the saved state from a file
+# Function to load the saved state from a JSON file or convert from a pickle file
 def load_state():
-    if os.path.exists(STATE_FILE):
-        with open(STATE_FILE, 'rb') as f:
+    if os.path.exists(JSON_STATE_FILE):
+        with open(JSON_STATE_FILE, 'r') as f:
+            state = json.load(f)
+        # Convert strings back to datetime objects if necessary
+        if isinstance(state['end_of_hour'], str):
+            state['end_of_hour'] = datetime.fromisoformat(state['end_of_hour'])
+        for k, v in state['data_dict'].items():
+            v['time'] = [datetime.fromisoformat(t) if isinstance(t, str) else t for t in v['time']]
+        logging.info("State loaded from JSON file.")
+        return state
+    elif os.path.exists(PICKLE_STATE_FILE):
+        # Convert the pickle file to JSON
+        with open(PICKLE_STATE_FILE, 'rb') as f:
             state = pickle.load(f)
-        logging.info("State loaded from file.")
+        if isinstance(state['end_of_hour'], datetime):
+            state['end_of_hour'] = state['end_of_hour'].isoformat()  # Convert datetime to ISO format for JSON
+        # Convert all datetime objects in 'data_dict' to ISO format for JSON
+        state['data_dict'] = {k: {'time': [t.isoformat() if isinstance(t, datetime) else t for t in v['time']], 'score': v['score']} for k, v in state['data_dict'].items()}
+        with open(JSON_STATE_FILE, 'w') as f:
+            json.dump(state, f, indent=4)
+        os.remove(PICKLE_STATE_FILE)  # Remove the pickle file after conversion
+        logging.info("Converted pickle state to JSON and loaded state.")
         return state
     return None
 
@@ -156,8 +183,8 @@ try:
             end_of_hour = (current_time + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
 
             # Remove state file as new hour has started
-            if os.path.exists(STATE_FILE):
-                os.remove(STATE_FILE)
+            if os.path.exists(JSON_STATE_FILE):
+                os.remove(JSON_STATE_FILE)
 
             continue
 
@@ -173,7 +200,7 @@ try:
                     if username not in data_dict or (data_dict[username]['score'] and score != data_dict[username]['score'][-1]):
                         if username not in data_dict:
                             data_dict[username] = {'time': [], 'score': []}
-                        data_dict[username]['time'].append(current_time)
+                        data_dict[username]['time'].append(current_time.isoformat())  # Convert datetime to ISO format for JSON
                         data_dict[username]['score'].append(score)
             # Periodically save the state to avoid losing progress
             save_state(data_dict, end_of_hour)
