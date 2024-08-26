@@ -1,10 +1,10 @@
-import requests
+import httpx
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import time
 
-# Initialize a session object for persistent connections
-session = requests.Session()
+# Initialize an HTTPX client with HTTP/2 support
+client = httpx.Client(http2=True)
 
 # Function to fetch data from the endpoint with added timeout and retry logic
 def fetch_data(max_retries=3, retry_delay=2):
@@ -20,7 +20,7 @@ def fetch_data(max_retries=3, retry_delay=2):
             current_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
             print(f"{current_timestamp} - Attempting to fetch data (Attempt {attempt + 1})...")
             start_time = time.time()
-            response = session.get(url, params=params, timeout=5)  # Use session for the GET request
+            response = client.get(url, params=params, timeout=5.0)  # Use client for the GET request
             response.raise_for_status()  # Raise an error for bad status codes
             duration = time.time() - start_time
             print(f"{current_timestamp} - Data fetched successfully in {duration:.2f} seconds")
@@ -30,7 +30,7 @@ def fetch_data(max_retries=3, retry_delay=2):
             except ValueError:
                 print(f"{current_timestamp} - Error parsing JSON!")
                 return None
-        except requests.exceptions.RequestException as e:
+        except httpx.RequestError as e:
             print(f"{current_timestamp} - Error fetching data: {e}")
             if attempt < max_retries - 1:
                 print(f"{current_timestamp} - Retrying in {retry_delay} seconds...")
@@ -115,5 +115,5 @@ try:
         time.sleep(fetch_interval)
 
 finally:
-    # Close the session when done
-    session.close()
+    # Close the client when done
+    client.close()
