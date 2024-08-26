@@ -9,7 +9,7 @@ import logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    datefmt='%Y-%m-%d %H:%M:%S.%f'
 )
 
 # Initialize an HTTPX client with HTTP/2 support
@@ -75,17 +75,21 @@ try:
                     y=values['score'], 
                     mode='lines+markers', 
                     line_shape='hv',  # Use horizontal-vertical steps for accurate jumps
-                    name=username
+                    name=username,
+                    hovertemplate='%{x|%Y-%m-%d %H:%M:%S.%L}<br>Score: %{y}<extra></extra>'  # Custom hover template
                 ))
-            
+
             fig.update_layout(
                 title='Top 50 Player Scores Over Time',
-                xaxis_title='Time (HH:MM:SS.SSS)',  # Update the title to indicate milliseconds are included
+                xaxis_title='Time (HH:MM)',  # Axis title to indicate minute-level granularity
                 yaxis_title='Score',
-                xaxis=dict(tickformat='%H:%M:%S.%L'),  # Include milliseconds in the tick format
+                xaxis=dict(
+                    tickformat='%H:%M',  # Show hours and minutes on the axis
+                    hoverformat='%H:%M:%S.%L'  # Show hours, minutes, seconds, and milliseconds on hover
+                ),
                 legend=dict(font=dict(size=10))
             )
-            
+
             # Save the interactive HTML graph
             html_file_name = f'player_scores_{current_time.strftime("%Y%m%d_%H%M%S")}.html'
             fig.write_html(html_file_name)
@@ -95,6 +99,7 @@ try:
             png_file_name = f'player_scores_{current_time.strftime("%Y%m%d_%H%M%S")}.png'
             fig.write_image(png_file_name, format='png')
             logging.info(f"Graph saved as {png_file_name}")
+
 
             # Reset the data for the new round
             logging.info("Resetting data for the new hour...")
