@@ -32,7 +32,10 @@ def fetch_data(max_retries=3, retry_delay=2):
             start_time = time.time()
             logging.info(f"Attempting to fetch data (Attempt {attempt + 1})...")
             response = client.get(url, params=params, headers=headers, timeout=5.0)  # Include headers in the request
-            response.raise_for_status()  # Raise an error for bad status codes
+            
+            # Check for HTTP errors and raise if any
+            response.raise_for_status()
+            
             duration = time.time() - start_time
             logging.info(f"Data fetched successfully in {duration:.2f} seconds")
             try:
@@ -41,6 +44,20 @@ def fetch_data(max_retries=3, retry_delay=2):
             except ValueError:
                 logging.error("Error parsing JSON!")
                 return None
+        
+        except httpx.HTTPStatusError as e:
+            # Handle specific HTTP errors
+            if e.response.status_code == 403:
+                logging.warning(f"403 Forbidden error occurred. Retrying in {retry_delay} seconds...")
+            else:
+                logging.error(f"HTTP error occurred: {e}")
+            # Retry on certain HTTP status codes
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+            else:
+                logging.error("Max retries reached. Skipping this fetch.")
+                return None
+        
         except httpx.RequestError as e:
             logging.error(f"Error fetching data: {e}")
             if attempt < max_retries - 1:
