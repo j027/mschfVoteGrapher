@@ -1,6 +1,6 @@
 import requests
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 
 # Function to fetch data from the endpoint with added timeout and retry logic
@@ -38,40 +38,17 @@ def fetch_data(max_retries=3, retry_delay=2):
 
 # Initialize variables
 data_dict = {}
-last_save_time = datetime.now()
+fetch_interval = 0.4  # Fetch data every 0.5 seconds
 
-# Parameters
-fetch_interval = 0.5  # Fetch data every 0.5 seconds
-save_interval = 600   # Save graph every 10 minutes
+# Calculate the end of the current hour
+current_time = datetime.now()
+end_of_hour = (current_time + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
 
 while True:
     current_time = datetime.now()
 
-    # Reset the graph and data storage at the start of a new hour
-    if current_time.minute == 0 and current_time.second == 0:
-        print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S')} - Resetting data for the new hour...")
-        data_dict = {}
-        last_save_time = current_time
-
-    # Fetch data
-    data = fetch_data()
-    if data and 'players' in data:
-        players = data['players']
-        for player in players:
-            username = player.get('username')
-            score = player.get('score')
-            if username and score is not None:
-                # Add data only if there's a change in score
-                if username not in data_dict or (data_dict[username]['score'] and score != data_dict[username]['score'][-1]):
-                    if username not in data_dict:
-                        data_dict[username] = {'time': [], 'score': []}
-                    data_dict[username]['time'].append(current_time)
-                    data_dict[username]['score'].append(score)
-    else:
-        print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S')} - No valid player data found.")
-    
-    # Save the graph at specified intervals
-    if (current_time - last_save_time).total_seconds() >= save_interval:
+    # Check if it's past the end of the current hour
+    if current_time >= end_of_hour:
         fig = go.Figure()
 
         # Sort players by their latest score and pick the top 50
@@ -104,7 +81,31 @@ while True:
         fig.write_image(png_file_name, format='png')
         print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S')} - Graph saved as {png_file_name}")
 
-        last_save_time = current_time
+        # Reset the data for the new round
+        print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S')} - Resetting data for the new hour...")
+        data_dict = {}
+
+        # Calculate the end of the next hour
+        end_of_hour = (current_time + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+
+        continue
+
+    # Fetch data
+    data = fetch_data()
+    if data and 'players' in data:
+        players = data['players']
+        for player in players:
+            username = player.get('username')
+            score = player.get('score')
+            if username and score is not None:
+                # Add data only if there's a change in score
+                if username not in data_dict or (data_dict[username]['score'] and score != data_dict[username]['score'][-1]):
+                    if username not in data_dict:
+                        data_dict[username] = {'time': [], 'score': []}
+                    data_dict[username]['time'].append(current_time)
+                    data_dict[username]['score'].append(score)
+    else:
+        print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S')} - No valid player data found.")
     
     # Wait for the next fetch
     time.sleep(fetch_interval)
