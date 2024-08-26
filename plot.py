@@ -1,6 +1,5 @@
 import requests
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
+import plotly.graph_objects as go
 from datetime import datetime
 import time
 
@@ -9,7 +8,7 @@ def fetch_data(max_retries=3, retry_delay=2):
     url = "https://irk0p9p6ig.execute-api.us-east-1.amazonaws.com/prod/players"
     params = {
         'type': 'ostracize',
-        'quantity': 10,
+        'quantity': 50,  # Fetch data for top 50 players
         'startIndex': 0,
         'reversed': 'true'
     }
@@ -42,14 +41,14 @@ data_dict = {}
 last_save_time = datetime.now()
 
 # Parameters
-fetch_interval = 1      # Fetch data every 1 second
-save_interval = 600     # Save graph every 10 minutes
+fetch_interval = 0.5  # Fetch data every 0.5 seconds
+save_interval = 600   # Save graph every 10 minutes
 
 while True:
     current_time = datetime.now()
     
-    # Reset the graph at xx:00:01 of every hour
-    if current_time.minute == 0 and current_time.second == 1:
+    # Reset the graph at 00:00 of every hour
+    if current_time.minute == 0 and current_time.second == 0:
         print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S')} - Resetting data for the new hour...")
         data_dict = {}
         last_save_time = current_time
@@ -71,26 +70,32 @@ while True:
     
     # Save the graph at specified intervals
     if (current_time - last_save_time).total_seconds() >= save_interval:
-        plt.figure(figsize=(10, 6))
-        
-        # Sort players by their latest score and pick the top 5
-        sorted_players = sorted(data_dict.items(), key=lambda x: x[1]['score'][-1], reverse=True)[:5]
-        
+        fig = go.Figure()
+
+        # Sort players by their latest score and pick the top 50
+        sorted_players = sorted(data_dict.items(), key=lambda x: x[1]['score'][-1], reverse=True)[:50]
+
         for username, values in sorted_players:
-            plt.plot(values['time'], values['score'], label=username)
+            fig.add_trace(go.Scatter(x=values['time'], y=values['score'], mode='lines+markers', name=username))
         
-        plt.xlabel('Time (HH:MM)')
-        plt.ylabel('Score')
-        plt.title('Top 5 Player Scores Over Time')
-        plt.legend(loc='upper right', fontsize='small')
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-        plt.gcf().autofmt_xdate()
+        fig.update_layout(
+            title='Top 50 Player Scores Over Time',
+            xaxis_title='Time (HH:MM)',
+            yaxis_title='Score',
+            xaxis=dict(tickformat='%H:%M'),
+            legend=dict(font=dict(size=10))
+        )
         
-        file_name = f'player_scores_{current_time.strftime("%Y%m%d_%H%M%S")}.png'
-        plt.savefig(file_name)
-        plt.close()
-        
-        print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S')} - Graph saved as {file_name}")
+        # Save the interactive HTML graph
+        html_file_name = f'player_scores_{current_time.strftime("%Y%m%d_%H%M%S")}.html'
+        fig.write_html(html_file_name)
+        print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S')} - Graph saved as {html_file_name}")
+
+        # Save the graph as a static PNG image as a fallback
+        png_file_name = f'player_scores_{current_time.strftime("%Y%m%d_%H%M%S")}.png'
+        fig.write_image(png_file_name, format='png')
+        print(f"{current_time.strftime('%Y-%m-%d %H:%M:%S')} - Graph saved as {png_file_name}")
+
         last_save_time = current_time
     
     # Wait for the next fetch
