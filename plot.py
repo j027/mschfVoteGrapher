@@ -75,9 +75,8 @@ try:
                     y=values['score'], 
                     mode='lines+markers', 
                     line_shape='hv',  # Use horizontal-vertical steps for accurate jumps
-                    name=username,
-                    hovertemplate='%{x|%Y-%m-%d %H:%M:%S.%L}<br>Score: %{y}<extra></extra>'  # Custom hover template
-                ))
+                    name=username)
+                )
 
             fig.update_layout(
                 title='Top 50 Player Scores Over Time',
