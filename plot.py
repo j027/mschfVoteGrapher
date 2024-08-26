@@ -6,7 +6,6 @@ from fake_useragent import UserAgent
 import logging
 import json
 import os
-import pickle
 
 # Set up logging configuration with milliseconds
 logging.basicConfig(
@@ -21,7 +20,6 @@ user_agent = UserAgent()  # Initialize UserAgent object
 
 # File to save state
 JSON_STATE_FILE = 'leaderboard_state.json'
-PICKLE_STATE_FILE = 'leaderboard_state.pkl'
 
 # Function to fetch data from the endpoint with added timeout and retry logic
 def fetch_data(max_retries=3, retry_delay=2):
@@ -91,7 +89,6 @@ def save_state(data_dict, end_of_hour):
         json.dump(state, f, indent=4)
     logging.info("State saved to JSON file.")
 
-# Function to load the saved state from a JSON file or convert from a pickle file
 def load_state():
     if os.path.exists(JSON_STATE_FILE):
         with open(JSON_STATE_FILE, 'r') as f:
@@ -102,19 +99,6 @@ def load_state():
         for k, v in state['data_dict'].items():
             v['time'] = [datetime.fromisoformat(t) if isinstance(t, str) else t for t in v['time']]
         logging.info("State loaded from JSON file.")
-        return state
-    elif os.path.exists(PICKLE_STATE_FILE):
-        # Convert the pickle file to JSON
-        with open(PICKLE_STATE_FILE, 'rb') as f:
-            state = pickle.load(f)
-        if isinstance(state['end_of_hour'], datetime):
-            state['end_of_hour'] = state['end_of_hour'].isoformat()  # Convert datetime to ISO format for JSON
-        # Convert all datetime objects in 'data_dict' to ISO format for JSON
-        state['data_dict'] = {k: {'time': [t.isoformat() if isinstance(t, datetime) else t for t in v['time']], 'score': v['score']} for k, v in state['data_dict'].items()}
-        with open(JSON_STATE_FILE, 'w') as f:
-            json.dump(state, f, indent=4)
-        os.remove(PICKLE_STATE_FILE)  # Remove the pickle file after conversion
-        logging.info("Converted pickle state to JSON and loaded state.")
         return state
     return None
 
