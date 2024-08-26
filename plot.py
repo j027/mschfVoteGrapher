@@ -4,8 +4,10 @@ from datetime import datetime, timedelta
 import time
 from fake_useragent import UserAgent
 import logging
+import pickle
+import os
 
-# Set up logging configuration
+# Set up logging configuration with milliseconds
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s',
@@ -15,6 +17,9 @@ logging.basicConfig(
 # Initialize an HTTPX client with HTTP/2 support
 client = httpx.Client(http2=True)
 user_agent = UserAgent()  # Initialize UserAgent object
+
+# File to save state
+STATE_FILE = 'leaderboard_state.pkl'
 
 # Function to fetch data from the endpoint with added timeout and retry logic
 def fetch_data(max_retries=3, retry_delay=2):
@@ -44,7 +49,7 @@ def fetch_data(max_retries=3, retry_delay=2):
             except ValueError:
                 logging.error("Error parsing JSON!")
                 return None
-        
+
         except httpx.HTTPStatusError as e:
             # Handle specific HTTP errors
             if e.response.status_code == 403:
@@ -57,7 +62,7 @@ def fetch_data(max_retries=3, retry_delay=2):
             else:
                 logging.error("Max retries reached. Skipping this fetch.")
                 return None
-        
+
         except httpx.RequestError as e:
             logging.error(f"Error fetching data: {e}")
             if attempt < max_retries - 1:
@@ -67,13 +72,40 @@ def fetch_data(max_retries=3, retry_delay=2):
                 logging.error("Max retries reached. Skipping this fetch.")
                 return None
 
+# Function to save the current state to a file
+def save_state(data_dict, end_of_hour):
+    state = {
+        'data_dict': data_dict,
+        'end_of_hour': end_of_hour
+    }
+    with open(STATE_FILE, 'wb') as f:
+        pickle.dump(state, f)
+    logging.info("State saved to file.")
+
+# Function to load the saved state from a file
+def load_state():
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE, 'rb') as f:
+            state = pickle.load(f)
+        logging.info("State loaded from file.")
+        return state
+    return None
+
 # Initialize variables
-data_dict = {}
-fetch_interval = 0.5  # Fetch data every 0.5 seconds
+fetch_interval = 0.1  # Fetch data every 0.1 seconds
 
 # Calculate the end of the current hour
 current_time = datetime.now()
 end_of_hour = (current_time + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+
+# Load saved state if it exists and is still valid
+saved_state = load_state()
+if saved_state and saved_state['end_of_hour'] == end_of_hour:
+    data_dict = saved_state['data_dict']
+    logging.info("Loaded previous state from the same hour.")
+else:
+    data_dict = {}
+    logging.info("No valid previous state found or new hour started. Starting fresh.")
 
 try:
     while True:
@@ -92,9 +124,9 @@ try:
                     y=values['score'], 
                     mode='lines+markers', 
                     line_shape='hv',  # Use horizontal-vertical steps for accurate jumps
-                    name=username)
-                )
-
+                    name=username
+                ))
+            
             fig.update_layout(
                 title='Top 50 Player Scores Over Time',
                 xaxis_title='Time (HH:MM)',  # Axis title to indicate minute-level granularity
@@ -105,7 +137,7 @@ try:
                 ),
                 legend=dict(font=dict(size=10))
             )
-
+            
             # Save the interactive HTML graph
             html_file_name = f'player_scores_{current_time.strftime("%Y%m%d_%H%M%S")}.html'
             fig.write_html(html_file_name)
@@ -116,13 +148,16 @@ try:
             fig.write_image(png_file_name, format='png')
             logging.info(f"Graph saved as {png_file_name}")
 
-
             # Reset the data for the new round
             logging.info("Resetting data for the new hour...")
             data_dict = {}
 
             # Calculate the end of the next hour
             end_of_hour = (current_time + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+
+            # Remove state file as new hour has started
+            if os.path.exists(STATE_FILE):
+                os.remove(STATE_FILE)
 
             continue
 
@@ -140,6 +175,8 @@ try:
                             data_dict[username] = {'time': [], 'score': []}
                         data_dict[username]['time'].append(current_time)
                         data_dict[username]['score'].append(score)
+            # Periodically save the state to avoid losing progress
+            save_state(data_dict, end_of_hour)
         else:
             logging.warning("No valid player data found.")
         
@@ -147,5 +184,7 @@ try:
         time.sleep(fetch_interval)
 
 finally:
+    # Save the state before exiting
+    save_state(data_dict, end_of_hour)
     # Close the client when done
     client.close()
