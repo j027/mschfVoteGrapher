@@ -43,7 +43,7 @@ def fetch_data(client, max_retries=3, retry_delay=2):
     url = "https://irk0p9p6ig.execute-api.us-east-1.amazonaws.com/prod/players"
     params = {
         'type': 'ostracize',
-        'quantity': 50,  # Fetch data for top 50 players
+        'quantity': 12000,  # Fetch data for all players, to handle leaderboard clearing properly
         'startIndex': 0,
         'reversed': 'true'
     }
@@ -188,10 +188,6 @@ try:
             # Remove state file as new hour has started
             if os.path.exists(JSON_STATE_FILE):
                 os.remove(JSON_STATE_FILE)
-            
-            # Wait 2 seconds before collecting data for the next hour
-            # this is to help make sure data from previous hour isn't in the next hour's graph
-            time.sleep(2)
 
             continue
 
