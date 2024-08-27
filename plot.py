@@ -43,7 +43,7 @@ def fetch_data(client, max_retries=3, retry_delay=2):
     url = "https://irk0p9p6ig.execute-api.us-east-1.amazonaws.com/prod/players"
     params = {
         'type': 'ostracize',
-        'quantity': 12000,  # Fetch data for all players, to handle leaderboard clearing properly
+        'quantity': 50,  # Fetch data for top 50
         'startIndex': 0,
         'reversed': 'true'
     }
@@ -125,12 +125,13 @@ fetch_interval = 0.1  # Reduced interval to 0.1 seconds since we're using multip
 client_index = 0  # Start with the first client
 
 # Calculate the end of the current hour
+# reset happens at 4th second of the next hour, so counting that as the end
 current_time = datetime.now()
-end_of_hour = (current_time + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+end_of_hour = (current_time + timedelta(hours=1)).replace(minute=0, second=4, microsecond=0)
 
 # Load saved state if it exists and is still valid
 saved_state = load_state()
-if saved_state and saved_state['end_of_hour'] == end_of_hour:
+if saved_state and saved_state['end_of_hour'].hour == end_of_hour.hour:
     data_dict = saved_state['data_dict']
     logging.info("Loaded previous state from the same hour.")
 else:
@@ -183,7 +184,8 @@ try:
             data_dict = {}
 
             # Calculate the end of the next hour
-            end_of_hour = (current_time + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+            # reset happens at 4th second of the next hour, so counting that as the end
+            end_of_hour = (current_time + timedelta(hours=1)).replace(minute=0, second=4, microsecond=0)
 
             # Remove state file as new hour has started
             if os.path.exists(JSON_STATE_FILE):
