@@ -169,6 +169,10 @@ try:
             # Remove state file as new hour has started
             if os.path.exists(JSON_STATE_FILE):
                 os.remove(JSON_STATE_FILE)
+            
+            # Wait 2 seconds before collecting data for the next hour
+            # this is to help make sure data from previous hour isn't in the next hour's graph
+            time.sleep(2)
 
             continue
 
