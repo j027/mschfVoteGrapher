@@ -14,15 +14,32 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# Initialize an HTTPX client with HTTP/2 support
-client = httpx.Client(http2=True)
+# Function to read proxies from a file
+def read_proxies(file_path='proxies.txt'):
+    proxies = []
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as f:
+            proxies = [line.strip() for line in f if line.strip()]
+    return proxies
+
+# Initialize proxies
+proxies = read_proxies()
+if not proxies:
+    logging.error("No proxies found. Please ensure 'proxies.txt' contains proxies.")
+    exit(1)  # Exit if no proxies are found
+
+# Create a list of HTTPX clients, each using a different proxy
+clients = []
+for proxy_url in proxies:
+    clients.append(httpx.Client(http2=True, proxies={"http://": proxy_url, "https://": proxy_url}))
+
 user_agent = UserAgent()  # Initialize UserAgent object
 
 # File to save state
 JSON_STATE_FILE = 'leaderboard_state.json'
 
 # Function to fetch data from the endpoint with added timeout and retry logic
-def fetch_data(max_retries=3, retry_delay=2):
+def fetch_data(client, max_retries=3, retry_delay=2):
     url = "https://irk0p9p6ig.execute-api.us-east-1.amazonaws.com/prod/players"
     params = {
         'type': 'ostracize',
@@ -89,6 +106,7 @@ def save_state(data_dict, end_of_hour):
         json.dump(state, f, indent=4)
     logging.info("State saved to JSON file.")
 
+# Function to load the saved state from a JSON file
 def load_state():
     if os.path.exists(JSON_STATE_FILE):
         with open(JSON_STATE_FILE, 'r') as f:
@@ -103,7 +121,8 @@ def load_state():
     return None
 
 # Initialize variables
-fetch_interval = 0.5
+fetch_interval = 0.1  # Reduced interval to 0.1 seconds since we're using multiple proxies
+client_index = 0  # Start with the first client
 
 # Calculate the end of the current hour
 current_time = datetime.now()
@@ -176,8 +195,8 @@ try:
 
             continue
 
-        # Fetch data
-        data = fetch_data()
+        # Fetch data using the current client
+        data = fetch_data(clients[client_index])
         if data and 'players' in data:
             players = data['players']
             for player in players:
@@ -195,11 +214,15 @@ try:
         else:
             logging.warning("No valid player data found.")
         
+        # Increment the client index for the next request
+        client_index = (client_index + 1) % len(clients)
+
         # Wait for the next fetch
         time.sleep(fetch_interval)
 
 finally:
     # Save the state before exiting
     save_state(data_dict, end_of_hour)
-    # Close the client when done
-    client.close()
+    # Close all clients when done
+    for client in clients:
+        client.close()
