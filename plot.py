@@ -171,7 +171,7 @@ try:
             
             # Save the interactive HTML graph
             html_file_name = f'player_scores_{current_time.strftime("%Y%m%d_%H%M%S")}.html'
-            fig.write_html(html_file_name)
+            fig.write_html(html_file_name, include_plotlyjs="cdn")
             logging.info(f"Graph saved as {html_file_name}")
 
             # Save the graph as a static PNG image as a fallback
