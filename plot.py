@@ -207,51 +207,32 @@ try:
 
             # Check for reset if past the end of the hour
             if current_time >= end_of_hour:
-                # Find the player with the highest score in the data_dict
-                highest_score_player = max(
-                    data_dict.items(), 
-                    key=lambda item: item[1][-1]["score"],  # Compare by the last recorded score
-                    default=(None, None)  # Return (None, None) if data_dict is empty
-                )[0]  # Extract the player username from the tuple
-
-                if highest_score_player:
-                    highest_score = data_dict[highest_score_player][-1]["score"]
-
-                    # Check if the player still exists in the fetched players list and get their new score
-                    current_player_data = next(
-                        (player for player in players if player["username"] == highest_score_player), 
-                        None
+                # Check if all players have a score of 0
+                if all(player["score"] == 0 for player in players):
+                    logging.info(
+                        "Detected leaderboard reset as all players have a score of 0."
                     )
 
-                    # If the player is not found or their score is lower than the last recorded score
-                    if not current_player_data or current_player_data["score"] < highest_score:
-                        logging.info(
-                            "Detected leaderboard reset based on highest score player."
-                        )
+                    # Save the current data before moving to the next hour
+                    save_graph(end_of_hour, data_dict)
 
-                        # Save the current data before moving to the next hour
-                        save_graph(end_of_hour, data_dict)
+                    # Reset the data for the new round
+                    logging.info("Resetting data for the new hour...")
+                    data_dict = {}
 
-                        # Reset the data for the new round
-                        logging.info("Resetting data for the new hour...")
-                        data_dict = {}
+                    # Reset the leaderboard size for the next hour
+                    leaderboard_size = 50
 
-                        # Reset the leaderboard size for the next hour
-                        leaderboard_size = 50
+                    # Calculate the end of the next hour
+                    end_of_hour = (current_time + timedelta(hours=1)).replace(
+                        minute=0, second=0, microsecond=0
+                    )
 
-                        # Calculate the end of the next hour
-                        end_of_hour = (current_time + timedelta(hours=1)).replace(
-                            minute=0, second=0, microsecond=0
-                        )
+                    # Remove the state file as the new hour has started
+                    if os.path.exists(JSON_STATE_FILE):
+                        os.remove(JSON_STATE_FILE)
 
-                        # Remove the state file as the new hour has started
-                        if os.path.exists(JSON_STATE_FILE):
-                            os.remove(JSON_STATE_FILE)
-
-                        continue
-                else:
-                    logging.warning("No players found in data_dict to check for reset.")
-
+                    continue
 
             # check last score, to increase leaderboard size as needed
             last_score = players[-1]["score"] if players else None
