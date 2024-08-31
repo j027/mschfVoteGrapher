@@ -222,7 +222,7 @@ try:
             if current_time >= end_of_hour:
                 # first place info from current leaderboard
                 first_place_player = players[0]
-                first_place_name = first_place_player["name"]
+                first_place_name = first_place_player["username"]
                 first_place_score = first_place_player["score"]
 
                 # if first place name isn't in the saved data 
