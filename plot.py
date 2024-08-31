@@ -14,7 +14,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-
 # Function to read proxies from a file
 def read_proxies(file_path="proxies.txt"):
     proxies = []
@@ -22,7 +21,6 @@ def read_proxies(file_path="proxies.txt"):
         with open(file_path, "r") as f:
             proxies = [line.strip() for line in f if line.strip()]
     return proxies
-
 
 # Initialize proxies
 proxies = read_proxies()
@@ -41,7 +39,6 @@ user_agent = UserAgent()  # Initialize UserAgent object
 
 # File to save state
 JSON_STATE_FILE = "leaderboard_state.json"
-
 
 # Function to fetch data from the endpoint with added timeout and retry logic
 def fetch_data(client, quantity, max_retries=3, retry_delay=2):
@@ -100,7 +97,6 @@ def fetch_data(client, quantity, max_retries=3, retry_delay=2):
                 logging.error("Max retries reached. Skipping this fetch.")
                 return None
 
-
 # Function to save the current state to a JSON file
 def save_state(data_dict, end_of_hour):
     # Ensure end_of_hour is a datetime object before converting
@@ -112,12 +108,7 @@ def save_state(data_dict, end_of_hour):
     # Convert datetime objects in data_dict to ISO format for JSON serialization
     state = {
         "data_dict": {
-            k: {
-                "time": [
-                    t.isoformat() if isinstance(t, datetime) else t for t in v["time"]
-                ],
-                "score": v["score"],
-            }
+            k: [{"time": t["time"].isoformat(), "score": t["score"]} for t in v]
             for k, v in data_dict.items()
         },
         "end_of_hour": end_of_hour_str,
@@ -125,7 +116,6 @@ def save_state(data_dict, end_of_hour):
     with open(JSON_STATE_FILE, "w") as f:
         json.dump(state, f, indent=4)
     logging.info("State saved to JSON file.")
-
 
 # Function to load the saved state from a JSON file
 def load_state():
@@ -136,24 +126,22 @@ def load_state():
         if isinstance(state["end_of_hour"], str):
             state["end_of_hour"] = datetime.fromisoformat(state["end_of_hour"])
         for k, v in state["data_dict"].items():
-            v["time"] = [
-                datetime.fromisoformat(t) if isinstance(t, str) else t
-                for t in v["time"]
-            ]
+            state["data_dict"][k] = [{"time": datetime.fromisoformat(t["time"]), "score": t["score"]} for t in v]
         logging.info("State loaded from JSON file.")
         return state
     return None
-
 
 def save_graph(end_of_hour, data_dict):
     fig = go.Figure()
 
     # Graph all players in the current data
-    for username, values in data_dict.items():
+    for username, records in data_dict.items():
+        times = [entry["time"] for entry in records]
+        scores = [entry["score"] for entry in records]
         fig.add_trace(
             go.Scatter(
-                x=values["time"],
-                y=values["score"],
+                x=times,
+                y=scores,
                 mode="lines+markers",
                 line_shape="hv",  # Use horizontal-vertical steps for accurate jumps
                 name=username,
@@ -180,7 +168,6 @@ def save_graph(end_of_hour, data_dict):
     png_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.png'
     fig.write_image(png_file_name, format="png")
     logging.info(f"Graph saved as {png_file_name}")
-
 
 # Initialize variables
 fetch_interval = 0.1  # Reduced interval to 0.1 seconds since we're using multiple proxies
@@ -227,7 +214,7 @@ try:
 
                 # if first place name isn't in the saved data 
                 # or if the score is below what was last saved
-                if first_place_name not in data_dict or first_place_score < data_dict[first_place_name]["score"][-1]:
+                if first_place_name not in data_dict or first_place_score < data_dict[first_place_name][-1]["score"]:
                     logging.info(
                         "Detected leaderboard reset. Saving data and preparing for next hour."
                     )
@@ -274,15 +261,16 @@ try:
                 if username and score is not None:
                     # Add data only if there's a change in score
                     if username not in data_dict or (
-                        data_dict[username]["score"]
-                        and score != data_dict[username]["score"][-1]
+                        data_dict[username] and score != data_dict[username][-1]["score"]
                     ):
                         if username not in data_dict:
-                            data_dict[username] = {"time": [], "score": []}
+                            data_dict[username] = []
 
-                        # Convert datetime to ISO format for JSON
-                        data_dict[username]["time"].append(current_time.isoformat())
-                        data_dict[username]["score"].append(score)
+                        # Append the new time-score dictionary to the list
+                        data_dict[username].append({
+                            "time": current_time.isoformat(),
+                            "score": score
+                        })
 
             # Periodically save the state to avoid losing progress
             save_state(data_dict, end_of_hour)
