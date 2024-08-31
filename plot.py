@@ -227,7 +227,7 @@ try:
 
                 # if first place name isn't in the saved data 
                 # or if the score is below what was last saved
-                if first_place_name not in data_dict or first_place_score < data_dict[first_place_name][-1]:
+                if first_place_name not in data_dict or first_place_score < data_dict[first_place_name]["score"][-1]:
                     logging.info(
                         "Detected leaderboard reset. Saving data and preparing for next hour."
                     )
