@@ -126,7 +126,7 @@ def load_state():
         if isinstance(state["end_of_hour"], str):
             state["end_of_hour"] = datetime.fromisoformat(state["end_of_hour"])
         for k, v in state["data_dict"].items():
-            state["data_dict"][k] = [{"time": datetime.fromisoformat(t["time"]), "score": t["score"]} for t in v]
+            state["data_dict"][k] = [{"time": datetime.fromisoformat(t["time"]) if isinstance(t["time"], str) else t["time"], "score": t["score"]} for t in v]
         logging.info("State loaded from JSON file.")
         return state
     return None
@@ -268,7 +268,7 @@ try:
 
                         # Append the new time-score dictionary to the list
                         data_dict[username].append({
-                            "time": current_time.isoformat(),
+                            "time": current_time,
                             "score": score
                         })
 
