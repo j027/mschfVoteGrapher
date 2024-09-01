@@ -16,6 +16,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
+
 # Function to read proxies from a file
 def read_proxies(file_path="proxies.txt"):
     proxies = []
@@ -23,6 +24,7 @@ def read_proxies(file_path="proxies.txt"):
         with open(file_path, "r") as f:
             proxies = [line.strip() for line in f if line.strip()]
     return proxies
+
 
 # Initialize proxies
 proxies = read_proxies()
@@ -34,13 +36,16 @@ if not proxies:
 clients = []
 for proxy_url in proxies:
     clients.append(
-        httpx.AsyncClient(http2=True, proxies={"http://": proxy_url, "https://": proxy_url})
+        httpx.AsyncClient(
+            http2=True, proxies={"http://": proxy_url, "https://": proxy_url}
+        )
     )
 
 user_agent = UserAgent()  # Initialize UserAgent object
 
 lock = asyncio.Lock()
 JSON_STATE_FILE = "leaderboard_state.json"
+
 
 async def async_fetch_data(client, quantity, max_retries=3, retry_delay=2):
     url = "https://irk0p9p6ig.execute-api.us-east-1.amazonaws.com/prod/players"
@@ -59,7 +64,9 @@ async def async_fetch_data(client, quantity, max_retries=3, retry_delay=2):
                 f"Attempting to fetch data (Attempt {attempt + 1}) with quantity: {quantity}..."
             )
 
-            response = await client.get(url, params=params, headers=headers, timeout=5.0)
+            response = await client.get(
+                url, params=params, headers=headers, timeout=5.0
+            )
             response.raise_for_status()
             duration = time.time() - start_time
             logging.info(f"Data fetched successfully in {duration:.2f} seconds")
@@ -87,19 +94,33 @@ async def async_fetch_data(client, quantity, max_retries=3, retry_delay=2):
                 logging.error("Max retries reached. Skipping this fetch.")
                 return None
 
+
 async def async_save_state(data_dict, end_of_hour):
-    end_of_hour_str = end_of_hour.isoformat() if isinstance(end_of_hour, datetime) else end_of_hour
+    end_of_hour_str = (
+        end_of_hour.isoformat() if isinstance(end_of_hour, datetime) else end_of_hour
+    )
     state = {
         "data_dict": {
-            k: [{"time": t["time"].isoformat() if isinstance(t["time"], datetime) else t["time"], "score": t["score"]} for t in v]
+            k: [
+                {
+                    "time": (
+                        t["time"].isoformat()
+                        if isinstance(t["time"], datetime)
+                        else t["time"]
+                    ),
+                    "score": t["score"],
+                }
+                for t in v
+            ]
             for k, v in data_dict.items()
         },
         "end_of_hour": end_of_hour_str,
     }
-    
+
     async with aiofiles.open(JSON_STATE_FILE, "w") as f:
         await f.write(json.dumps(state, indent=4))
     logging.info("State saved to JSON file.")
+
 
 # Function to load the saved state from a JSON file
 def load_state():
@@ -110,10 +131,21 @@ def load_state():
         if isinstance(state["end_of_hour"], str):
             state["end_of_hour"] = datetime.fromisoformat(state["end_of_hour"])
         for k, v in state["data_dict"].items():
-            state["data_dict"][k] = [{"time": datetime.fromisoformat(t["time"]) if isinstance(t["time"], str) else t["time"], "score": t["score"]} for t in v]
+            state["data_dict"][k] = [
+                {
+                    "time": (
+                        datetime.fromisoformat(t["time"])
+                        if isinstance(t["time"], str)
+                        else t["time"]
+                    ),
+                    "score": t["score"],
+                }
+                for t in v
+            ]
         logging.info("State loaded from JSON file.")
         return state
     return None
+
 
 async def async_save_graph(end_of_hour, data_dict):
     async with lock:
@@ -143,7 +175,7 @@ async def async_save_graph(end_of_hour, data_dict):
                 hoverformat="%H:%M:%S.%L",
             ),
             legend=dict(font=dict(size=10)),
-            hovermode="x"  # Use hovermode "x" to see data points aligned by x-axis
+            hovermode="x",  # Use hovermode "x" to see data points aligned by x-axis
         )
 
         # Generate file names for saving the graph
@@ -156,10 +188,12 @@ async def async_save_graph(end_of_hour, data_dict):
         await loop.run_in_executor(None, fig.write_image, png_file_name, "png")
         logging.info(f"Graph saved as {html_file_name} and {png_file_name}")
 
+
 async def periodic_save_graph(interval, end_of_hour, data_dict):
     while True:
         await async_save_graph(end_of_hour, data_dict)
         await asyncio.sleep(interval)
+
 
 async def main():
     fetch_interval = 0.1  # Fetch data every 0.1 seconds
@@ -175,10 +209,14 @@ async def main():
     clients = []
     for proxy_url in proxies:
         clients.append(
-            httpx.AsyncClient(http2=True, proxies={"http://": proxy_url, "https://": proxy_url})
+            httpx.AsyncClient(
+                http2=True, proxies={"http://": proxy_url, "https://": proxy_url}
+            )
         )
 
-    end_of_hour = (datetime.now() + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+    end_of_hour = (datetime.now() + timedelta(hours=1)).replace(
+        minute=0, second=0, microsecond=0
+    )
 
     # Load saved state if it exists and is still valid
     saved_state = load_state()
@@ -191,10 +229,12 @@ async def main():
             await async_save_graph(previous_end_of_hour, saved_state["data_dict"])
 
         data_dict = {}
-        logging.info("No valid previous state found or new hour started. Starting fresh.")
+        logging.info(
+            "No valid previous state found or new hour started. Starting fresh."
+        )
 
     # Start periodic saving
-    save_interval = 30  # Save graph every 30 seconds
+    save_interval = 5  # Save graph every 5 seconds
     asyncio.create_task(periodic_save_graph(save_interval, end_of_hour, data_dict))
 
     try:
@@ -255,11 +295,18 @@ async def main():
                     score = player.get("score")
 
                     if username and score is not None:
-                        if username not in data_dict:
-                            data_dict[username] = []
+                        # Add data only if there's a change in score
+                        if username not in data_dict or (
+                            data_dict[username]
+                            and score != data_dict[username][-1]["score"]
+                        ):
+                            if username not in data_dict:
+                                data_dict[username] = []
 
-                        # Add new data point
-                        data_dict[username].append({"time": current_time, "score": score})
+                            # Append the new time-score dictionary to the list
+                            data_dict[username].append(
+                                {"time": current_time, "score": score}
+                            )
 
                 # Periodically save the state to avoid losing progress
                 await async_save_state(data_dict, end_of_hour)
@@ -279,6 +326,7 @@ async def main():
         # Close all clients when done
         for client in clients:
             await client.aclose()
+
 
 # Run the main function in the event loop
 asyncio.run(main())
