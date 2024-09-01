@@ -150,10 +150,6 @@ def load_state():
 
 
 async def async_save_graph(end_of_hour, data_dict):
-    if lock.locked():
-        return
-
-    # Acquire the lock
     async with lock:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(executor, save_graph_sync, end_of_hour, data_dict)
