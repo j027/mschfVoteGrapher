@@ -182,10 +182,10 @@ async def async_save_graph(end_of_hour, data_dict):
         html_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.html'
         png_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.png'
 
-        # Run synchronous save operations in the event loop's executor
+        # Run synchronous save operations in the event loop's executor using lambda functions
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, fig.write_html, html_file_name, "cdn")
-        await loop.run_in_executor(None, fig.write_image, png_file_name, "png")
+        await loop.run_in_executor(None, lambda: fig.write_html(html_file_name, include_plotlyjs="cdn"))
+        await loop.run_in_executor(None, lambda: fig.write_image(png_file_name, format="png"))
         logging.info(f"Graph saved as {html_file_name} and {png_file_name}")
 
 
