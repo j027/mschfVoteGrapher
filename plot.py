@@ -232,7 +232,7 @@ async def main():
 
     # Start periodic saving
     save_interval = 5  # Save graph every 5 seconds
-    asyncio.create_task(periodic_save_graph(save_interval, end_of_hour, data_dict))
+    save_graph_task = asyncio.create_task(periodic_save_graph(save_interval, end_of_hour, data_dict))
 
     try:
         while True:
@@ -266,6 +266,10 @@ async def main():
                         end_of_hour = (current_time + timedelta(hours=1)).replace(
                             minute=0, second=0, microsecond=0
                         )
+
+                        if save_graph_task:
+                            save_graph_task.cancel()
+                        save_graph_task = asyncio.create_task(periodic_save_graph(save_interval, end_of_hour, data_dict))
 
                         # Remove state file as the new hour has started
                         if os.path.exists(JSON_STATE_FILE):
@@ -320,9 +324,13 @@ async def main():
     finally:
         # Save the state before exiting
         await async_save_state(data_dict, end_of_hour)
+        
         # Close all clients when done
         for client in clients:
             await client.aclose()
+        
+        if save_graph_task:
+            save_graph_task.cancel()
 
 
 # Run the main function in the event loop
