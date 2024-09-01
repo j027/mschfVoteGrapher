@@ -148,45 +148,50 @@ def load_state():
 
 
 async def async_save_graph(end_of_hour, data_dict):
-    async with lock:
-        fig = go.Figure()
+    try:
+        async with lock:
+            logging.info("Acquired lock, starting to save graph.")
+            fig = go.Figure()
 
-        # Add data for each player to the graph
-        for username, records in data_dict.items():
-            times = [entry["time"] for entry in records]
-            scores = [entry["score"] for entry in records]
-            fig.add_trace(
-                go.Scatter(
-                    x=times,
-                    y=scores,
-                    mode="lines+markers",
-                    line_shape="hv",  # Use horizontal-vertical steps for accurate jumps
-                    name=username,
+            # Add data for each player to the graph
+            for username, records in data_dict.items():
+                times = [entry["time"] for entry in records]
+                scores = [entry["score"] for entry in records]
+                fig.add_trace(
+                    go.Scatter(
+                        x=times,
+                        y=scores,
+                        mode="lines+markers",
+                        line_shape="hv",  # Use horizontal-vertical steps for accurate jumps
+                        name=username,
+                    )
                 )
+
+            fig.update_layout(
+                title="Player Scores Over Time",
+                xaxis_title="Time (HH:MM)",
+                yaxis_title="Score",
+                xaxis=dict(
+                    tickformat="%H:%M",
+                    hoverformat="%H:%M:%S.%L",
+                ),
+                legend=dict(font=dict(size=10)),
+                hovermode="x"  # Use hovermode "x" to see data points aligned by x-axis
             )
 
-        # Update layout with titles and formatting
-        fig.update_layout(
-            title="Player Scores Over Time",
-            xaxis_title="Time (HH:MM)",
-            yaxis_title="Score",
-            xaxis=dict(
-                tickformat="%H:%M",
-                hoverformat="%H:%M:%S.%L",
-            ),
-            legend=dict(font=dict(size=10)),
-            hovermode="x",  # Use hovermode "x" to see data points aligned by x-axis
-        )
+            # Generate file names for saving the graph
+            html_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.html'
+            png_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.png'
 
-        # Generate file names for saving the graph
-        html_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.html'
-        png_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.png'
-
-        # Run synchronous save operations in the event loop's executor using lambda functions
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, lambda: fig.write_html(html_file_name, include_plotlyjs="cdn"))
-        await loop.run_in_executor(None, lambda: fig.write_image(png_file_name, format="png"))
-        logging.info(f"Graph saved as {html_file_name} and {png_file_name}")
+            # Run synchronous save operations in the event loop's executor
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, fig.write_html, html_file_name, "cdn")
+            await loop.run_in_executor(None, fig.write_image, png_file_name, "png")
+            logging.info(f"Graph saved as {html_file_name} and {png_file_name}")
+    except Exception as e:
+        logging.error(f"Error saving graph: {e}")
+    finally:
+        logging.info("Releasing lock after graph save attempt.")
 
 
 async def periodic_save_graph(interval, end_of_hour, data_dict):
@@ -251,31 +256,31 @@ async def main():
                     all_zero_scores = all(player["score"] == 0 for player in players)
 
                     if all_zero_scores:
-                        async with lock:
-                            logging.info(
-                                "Detected leaderboard reset. Saving data and preparing for next hour."
-                            )
+                        logging.info(
+                            "Detected leaderboard reset. Saving data and preparing for next hour."
+                        )
 
-                            # Save the current data before moving to the next hour
-                            await async_save_graph(end_of_hour, data_dict)
+                        # Save the current data before moving to the next hour
+                        await async_save_graph(end_of_hour, data_dict)
 
-                            # Reset the data for the new round
-                            logging.info("Resetting data for the new hour...")
-                            data_dict = {}
+                        # Reset the data for the new round
+                        logging.info("Resetting data for the new hour...")
+                        data_dict = {}
 
-                            # Reset the leaderboard size for the next hour
-                            leaderboard_size = 50
+                        # Reset the leaderboard size for the next hour
+                        leaderboard_size = 50
 
-                            # Calculate the end of the next hour
-                            end_of_hour = (current_time + timedelta(hours=1)).replace(
-                                minute=0, second=0, microsecond=0
-                            )
+                        # Calculate the end of the next hour
+                        end_of_hour = (current_time + timedelta(hours=1)).replace(
+                            minute=0, second=0, microsecond=0
+                        )
 
-                            # Remove state file as the new hour has started
-                            if os.path.exists(JSON_STATE_FILE):
-                                os.remove(JSON_STATE_FILE)
+                        # Remove state file as the new hour has started
+                        if os.path.exists(JSON_STATE_FILE):
+                            os.remove(JSON_STATE_FILE)
 
-                            continue
+                        continue
+
 
                 # Check last score, to increase leaderboard size as needed
                 last_score = players[-1]["score"] if players else None
