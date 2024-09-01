@@ -8,6 +8,7 @@ import logging
 import json
 import os
 import aiofiles
+from concurrent.futures import ThreadPoolExecutor
 
 # Set up logging configuration with milliseconds
 logging.basicConfig(
@@ -44,6 +45,7 @@ for proxy_url in proxies:
 user_agent = UserAgent()  # Initialize UserAgent object
 
 lock = asyncio.Lock()
+executor = ThreadPoolExecutor(max_workers=1)
 JSON_STATE_FILE = "leaderboard_state.json"
 
 
@@ -148,51 +150,45 @@ def load_state():
 
 
 async def async_save_graph(end_of_hour, data_dict):
-    try:
-        async with lock:
-            logging.info("Acquired lock, starting to save graph.")
-            fig = go.Figure()
+    if lock.locked():
+        return
 
-            # Add data for each player to the graph
-            for username, records in data_dict.items():
-                times = [entry["time"] for entry in records]
-                scores = [entry["score"] for entry in records]
-                fig.add_trace(
-                    go.Scatter(
-                        x=times,
-                        y=scores,
-                        mode="lines+markers",
-                        line_shape="hv",  # Use horizontal-vertical steps for accurate jumps
-                        name=username,
-                    )
-                )
+    # Acquire the lock
+    async with lock:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(executor, save_graph_sync, end_of_hour, data_dict)
 
-            fig.update_layout(
-                title="Player Scores Over Time",
-                xaxis_title="Time (HH:MM)",
-                yaxis_title="Score",
-                xaxis=dict(
-                    tickformat="%H:%M",
-                    hoverformat="%H:%M:%S.%L",
-                ),
-                legend=dict(font=dict(size=10)),
-                hovermode="x"  # Use hovermode "x" to see data points aligned by x-axis
+def save_graph_sync(end_of_hour, data_dict):
+    fig = go.Figure()
+
+    for username, records in data_dict.items():
+        times = [entry["time"] for entry in records]
+        scores = [entry["score"] for entry in records]
+        fig.add_trace(
+            go.Scatter(
+                x=times,
+                y=scores,
+                mode="lines+markers",
+                line_shape="hv",
+                name=username,
             )
+        )
 
-            # Generate file names for saving the graph
-            html_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.html'
-            png_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.png'
+    fig.update_layout(
+        title="Player Scores Over Time",
+        xaxis_title="Time (HH:MM)",
+        yaxis_title="Score",
+        xaxis=dict(tickformat="%H:%M", hoverformat="%H:%M:%S.%L"),
+        legend=dict(font=dict(size=10)),
+        hovermode="x"
+    )
 
-            # Run synchronous save operations in the event loop's executor
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, fig.write_html, html_file_name, "cdn")
-            await loop.run_in_executor(None, fig.write_image, png_file_name, "png")
-            logging.info(f"Graph saved as {html_file_name} and {png_file_name}")
-    except Exception as e:
-        logging.error(f"Error saving graph: {e}")
-    finally:
-        logging.info("Releasing lock after graph save attempt.")
+    html_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.html'
+    png_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.png'
 
+    fig.write_html(html_file_name, include_plotlyjs="cdn")
+    fig.write_image(png_file_name, format="png")
+    logging.info(f"Graph saved as {html_file_name} and {png_file_name}")
 
 async def periodic_save_graph(interval, end_of_hour, data_dict):
     while True:
