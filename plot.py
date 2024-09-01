@@ -157,6 +157,7 @@ def save_graph(end_of_hour, data_dict):
             hoverformat="%H:%M:%S.%L",  # Show hours, minutes, seconds, and milliseconds on hover
         ),
         legend=dict(font=dict(size=10)),
+        hovermode="x unified"
     )
 
     # Save the interactive HTML graph
