@@ -43,6 +43,10 @@ for proxy_url in proxies:
     )
 
 user_agent = UserAgent()  # Initialize UserAgent object
+# Define the directory where you want to save the files
+SAVE_DIRECTORY = os.path.expanduser("~/gdrive/ostracize_graphs")
+# Ensure the directory exists
+os.makedirs(SAVE_DIRECTORY, exist_ok=True)
 
 lock = asyncio.Lock()
 executor = ThreadPoolExecutor(max_workers=1)
@@ -179,8 +183,8 @@ def save_graph_sync(end_of_hour, data_dict):
         hovermode="x"
     )
 
-    html_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.html'
-    png_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.png'
+    html_file_name = os.path.join(SAVE_DIRECTORY, f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.html')
+    png_file_name = os.path.join(SAVE_DIRECTORY, f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.png')
 
     fig.write_html(html_file_name, include_plotlyjs="cdn")
     fig.write_image(png_file_name, format="png")
