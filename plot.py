@@ -175,7 +175,7 @@ def save_graph_sync(end_of_hour, data_dict):
         )
 
     fig.update_layout(
-        title="Player Scores Over Time",
+        title="Player Scores Over Time (Ostracize)",
         xaxis_title="Time (HH:MM)",
         yaxis_title="Score",
         xaxis=dict(tickformat="%H:%M", hoverformat="%H:%M:%S.%L"),
