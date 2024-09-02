@@ -235,7 +235,7 @@ async def main():
         )
 
     # Start periodic saving
-    save_interval = 5  # Save graph every 5 seconds
+    save_interval = 20  # Save graph every 20 seconds
     save_graph_task = asyncio.create_task(periodic_save_graph(save_interval, end_of_hour, data_dict))
 
     try:
