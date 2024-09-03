@@ -77,26 +77,40 @@ async def async_fetch_data(client, quantity, max_retries=3, retry_delay=2):
             return response.json()
 
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 403:
-                logging.warning(
-                    f"403 Forbidden error occurred. Retrying in {retry_delay} seconds..."
-                )
-            else:
-                logging.error(f"HTTP error occurred: {e}")
-            if attempt < max_retries - 1:
-                await asyncio.sleep(retry_delay)
-            else:
-                logging.error("Max retries reached. Skipping this fetch.")
-                return None
+            # Log the basic error message
+            logging.error(f"HTTP error occurred: {e}")
+
+            # Log request details
+            if e.request:
+                logging.error(f"Request URL: {e.request.url}")
+                logging.error(f"Request Method: {e.request.method}")
+                logging.error(f"Request Headers: {e.request.headers}")
+
+            # Log response details
+            if e.response:
+                logging.error(f"Response Status Code: {e.response.status_code}")
+                logging.error(f"Response Headers: {e.response.headers}")
+                logging.error(f"Response Content: {e.response.text}")
+
+            return None
 
         except httpx.RequestError as e:
-            logging.error(f"Error fetching data: {e}")
-            if attempt < max_retries - 1:
-                logging.info(f"Retrying in {retry_delay} seconds...")
-                await asyncio.sleep(retry_delay)
-            else:
-                logging.error("Max retries reached. Skipping this fetch.")
-                return None
+            # Log the basic error message
+            logging.error(f"Request error occurred: {e}")
+
+            # Log request details if available
+            if e.request:
+                logging.error(f"Request URL: {e.request.url}")
+                logging.error(f"Request Method: {e.request.method}")
+                logging.error(f"Request Headers: {e.request.headers}")
+
+            # Optionally, if the error includes response data
+            if e.response:
+                logging.error(f"Response Status Code: {e.response.status_code}")
+                logging.error(f"Response Headers: {e.response.headers}")
+                logging.error(f"Response Content: {e.response.text}")
+
+            return None
 
 async def async_save_state(data_dict, reset_time):
     reset_time_str = (
@@ -221,6 +235,7 @@ async def main():
         exit(1)  # Exit if no proxies are found
 
     clients = []
+    clients.append(httpx.AsyncClient(http2=True))
     for proxy_url in proxies:
         clients.append(
             httpx.AsyncClient(
