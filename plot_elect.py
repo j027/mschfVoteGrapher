@@ -151,7 +151,10 @@ def load_state():
 async def async_save_graph(reset_time, data_dict):
     async with lock:
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(executor, save_graph_sync, reset_time, data_dict)
+        try:
+            await loop.run_in_executor(executor, save_graph_sync, reset_time, data_dict)
+        except Exception as e:
+            logging.error(f"Failed to save graph: {e}")
 
 def save_graph_sync(reset_time, data_dict):
     fig = go.Figure()
@@ -243,7 +246,7 @@ async def main():
         logging.info("No valid previous state found or new reset period started. Starting fresh.")
     
     # Start periodic saving
-    save_interval = 30  # Save graph every 30 seconds
+    save_interval = 20  # Save graph every 20 seconds
     save_graph_task = asyncio.create_task(periodic_save_graph(save_interval, reset_time, data_dict))
 
     try:
