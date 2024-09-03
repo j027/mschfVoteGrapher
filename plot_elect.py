@@ -243,7 +243,7 @@ async def main():
         logging.info("No valid previous state found or new reset period started. Starting fresh.")
     
     # Start periodic saving
-    save_interval = 20  # Save graph every 20 seconds
+    save_interval = 30  # Save graph every 30 seconds
     save_graph_task = asyncio.create_task(periodic_save_graph(save_interval, reset_time, data_dict))
 
     try:
