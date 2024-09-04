@@ -51,7 +51,7 @@ lock = asyncio.Lock()
 executor = ThreadPoolExecutor(max_workers=1)
 JSON_STATE_FILE = "elect_leaderboard_state.json"  # New filename for "elect" votes
 
-async def async_fetch_data(client, quantity, max_retries=3, retry_delay=2):
+async def async_fetch_data(client, quantity, max_retries=3):
     url = "https://irk0p9p6ig.execute-api.us-east-1.amazonaws.com/prod/players"
     params = {
         "type": "elect",  # Update to "elect" type
@@ -69,7 +69,7 @@ async def async_fetch_data(client, quantity, max_retries=3, retry_delay=2):
             )
 
             response = await client.get(
-                url, params=params, headers=headers, timeout=5.0
+                url, params=params, headers=headers, timeout=0.5
             )
             response.raise_for_status()
             duration = time_module.time() - start_time
@@ -93,6 +93,11 @@ async def async_fetch_data(client, quantity, max_retries=3, retry_delay=2):
                 logging.error(f"Response Content: {e.response.text}")
 
             return None
+        
+        except httpx.TimeoutException as e:
+            # Handle and log timeouts
+            logging.error(f"Timeout error occurred: {e}")
+            return None
 
         except httpx.RequestError as e:
             # Log the basic error message
@@ -104,12 +109,11 @@ async def async_fetch_data(client, quantity, max_retries=3, retry_delay=2):
                 logging.error(f"Request Method: {e.request.method}")
                 logging.error(f"Request Headers: {e.request.headers}")
 
-            # Optionally, if the error includes response data
-            if e.response:
-                logging.error(f"Response Status Code: {e.response.status_code}")
-                logging.error(f"Response Headers: {e.response.headers}")
-                logging.error(f"Response Content: {e.response.text}")
+            return None
 
+        except Exception as e:
+            # General exception handling for any other errors
+            logging.error(f"An unexpected error occurred: {e}")
             return None
 
 async def async_save_state(data_dict, reset_time):

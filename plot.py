@@ -53,7 +53,7 @@ executor = ThreadPoolExecutor(max_workers=1)
 JSON_STATE_FILE = "leaderboard_state.json"
 
 
-async def async_fetch_data(client, quantity, max_retries=3, retry_delay=2):
+async def async_fetch_data(client, quantity, max_retries=3):
     url = "https://irk0p9p6ig.execute-api.us-east-1.amazonaws.com/prod/players"
     params = {
         "type": "ostracize",
@@ -110,12 +110,6 @@ async def async_fetch_data(client, quantity, max_retries=3, retry_delay=2):
                 logging.error(f"Request URL: {e.request.url}")
                 logging.error(f"Request Method: {e.request.method}")
                 logging.error(f"Request Headers: {e.request.headers}")
-
-            # Optionally, if the error includes response data
-            if e.response:
-                logging.error(f"Response Status Code: {e.response.status_code}")
-                logging.error(f"Response Headers: {e.response.headers}")
-                logging.error(f"Response Content: {e.response.text}")
 
             return None
 
