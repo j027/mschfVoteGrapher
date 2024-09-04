@@ -98,24 +98,17 @@ async def async_fetch_data(client, quantity, max_retries=3):
         
         except httpx.TimeoutException as e:
             # Handle and log timeouts
-            logging.error(f"Timeout error occurred: {e}")
+            logging.error(f"Timeout error occurred: {e} (Type: {type(e).__name__})")
             return None
 
         except httpx.RequestError as e:
             # Log the basic error message
-            logging.error(f"Request error occurred: {e}")
-
-            # Log request details if available
-            if e.request:
-                logging.error(f"Request URL: {e.request.url}")
-                logging.error(f"Request Method: {e.request.method}")
-                logging.error(f"Request Headers: {e.request.headers}")
-
+            logging.error(f"Request error occurred: {e} (Type: {type(e).__name__})")
             return None
 
         except Exception as e:
             # General exception handling for any other errors
-            logging.error(f"An unexpected error occurred: {e}")
+            logging.error(f"An unexpected error occurred: {e} (Type: {type(e).__name__})")
             return None
 
 
