@@ -71,7 +71,7 @@ async def async_fetch_data(client, quantity, max_retries=3, retry_delay=2):
             )
 
             response = await client.get(
-                url, params=params, headers=headers, timeout=5.0
+                url, params=params, headers=headers, timeout=0.5
             )
             response.raise_for_status()
             duration = time.time() - start_time
@@ -95,6 +95,11 @@ async def async_fetch_data(client, quantity, max_retries=3, retry_delay=2):
                 logging.error(f"Response Content: {e.response.text}")
 
             return None
+        
+        except httpx.TimeoutException as e:
+            # Handle and log timeouts
+            logging.error(f"Timeout error occurred: {e}")
+            return None
 
         except httpx.RequestError as e:
             # Log the basic error message
@@ -112,6 +117,11 @@ async def async_fetch_data(client, quantity, max_retries=3, retry_delay=2):
                 logging.error(f"Response Headers: {e.response.headers}")
                 logging.error(f"Response Content: {e.response.text}")
 
+            return None
+
+        except Exception as e:
+            # General exception handling for any other errors
+            logging.error(f"An unexpected error occurred: {e}")
             return None
 
 
