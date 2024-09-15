@@ -44,8 +44,11 @@ for proxy_url in proxies:
 user_agent = UserAgent()  # Initialize UserAgent object
 
 # Define the directory where you want to save the files
-SAVE_DIRECTORY = os.path.expanduser("~/gdrive/elect_graphs")  # Update directory for elect data
-os.makedirs(SAVE_DIRECTORY, exist_ok=True)
+SYNCED_DIRECTORY = os.path.expanduser("~/gdrive/elect_graphs")
+LOCAL_BACKUP_DIRECTORY = os.path.join(os.path.dirname(__file__), "elect_graphs")
+
+os.makedirs(SYNCED_DIRECTORY, exist_ok=True)
+os.makedirs(LOCAL_BACKUP_DIRECTORY, exist_ok=True)
 
 lock = asyncio.Lock()
 executor = ThreadPoolExecutor(max_workers=1)
@@ -159,6 +162,31 @@ def load_state():
         return state
     return None
 
+# Function to save the file with error handling
+def save_file_with_fallback(file_name, file_content, mime_type='text/html'):
+    synced_file_path = os.path.join(SYNCED_DIRECTORY, file_name)
+    local_file_path = os.path.join(LOCAL_BACKUP_DIRECTORY, file_name)
+    
+    try:
+        # Attempt to save in the rsync-synced folder first
+        with open(synced_file_path, "w") as f:
+            f.write(file_content)
+        logging.info(f"File successfully saved to rsync-synced folder: {synced_file_path}")
+    
+    except Exception as e:
+        # Log the failure and fallback to saving locally
+        logging.error(f"Failed to save in synced folder: {e}. Saving locally instead.")
+        
+        try:
+            with open(local_file_path, "w") as f:
+                f.write(file_content)
+            logging.info(f"File successfully saved to local backup folder: {local_file_path}")
+        except Exception as e_local:
+            logging.error(f"Failed to save locally: {e_local}. Giving up on saving file.")
+            return False  # Failed in both places
+    
+    return True  # File saved successfully
+
 async def async_save_graph(reset_time, data_dict):
     async with lock:
         loop = asyncio.get_running_loop()
@@ -192,12 +220,17 @@ def save_graph_sync(reset_time, data_dict):
         hovermode="x"
     )
 
-    html_file_name = os.path.join(SAVE_DIRECTORY, f'player_elect_scores_{reset_time.strftime("%Y%m%d_%H%M%S")}.html')
-    png_file_name = os.path.join(SAVE_DIRECTORY, f'player_elect_scores_{reset_time.strftime("%Y%m%d_%H%M%S")}.png')
+    # Save HTML and PNG files
+    html_file_name = f'player_elect_scores_{reset_time.strftime("%Y%m%d_%H%M%S")}.html'
+    png_file_name = f'player_elect_scores_{reset_time.strftime("%Y%m%d_%H%M%S")}.png'
 
-    fig.write_html(html_file_name, include_plotlyjs="cdn")
-    fig.write_image(png_file_name, format="png")
-    logging.info(f"Graph saved as {html_file_name} and {png_file_name}")
+    # Use the figure's internal save method to export the content
+    html_content = fig.to_html(include_plotlyjs="cdn")
+    png_content = fig.to_image(format="png")
+
+    # Attempt to save both files with fallback mechanism
+    save_file_with_fallback(html_file_name, html_content, mime_type='text/html')
+    save_file_with_fallback(png_file_name, png_content, mime_type='image/png')
 
 async def periodic_save_graph(interval, reset_time, data_dict):
     while True:
