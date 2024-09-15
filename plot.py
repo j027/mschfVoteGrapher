@@ -170,10 +170,13 @@ def load_state():
 def save_file_with_fallback(file_name, file_content, mime_type='text/html'):
     synced_file_path = os.path.join(SYNCED_DIRECTORY, file_name)
     local_file_path = os.path.join(LOCAL_BACKUP_DIRECTORY, file_name)
+
+    # Use text mode ('w') for HTML, binary mode ('wb') for everything else
+    write_mode = 'w' if mime_type == 'text/html' else 'wb'
     
     try:
         # Attempt to save in the rsync-synced folder first
-        with open(synced_file_path, "w") as f:
+        with open(synced_file_path, write_mode) as f:
             f.write(file_content)
         logging.info(f"File successfully saved to rsync-synced folder: {synced_file_path}")
     
@@ -182,7 +185,7 @@ def save_file_with_fallback(file_name, file_content, mime_type='text/html'):
         logging.error(f"Failed to save in synced folder: {e}. Saving locally instead.")
         
         try:
-            with open(local_file_path, "w") as f:
+            with open(local_file_path, write_mode) as f:
                 f.write(file_content)
             logging.info(f"File successfully saved to local backup folder: {local_file_path}")
         except Exception as e_local:
