@@ -72,7 +72,7 @@ async def async_fetch_data(client, quantity, max_retries=3):
             )
 
             response = await client.get(
-                url, params=params, headers=headers, timeout=0.5
+                url, params=params, headers=headers, timeout=0.25
             )
             response.raise_for_status()
             
@@ -260,7 +260,7 @@ def get_next_reset_time():
     return reset_time
 
 async def main():
-    fetch_interval = 0.1  # Fetch data every 0.1 seconds
+    fetch_interval = 0.05  # Fetch data every 0.05 seconds
     client_index = 0
     leaderboard_size = 50
     max_leaderboard_size = 12000
