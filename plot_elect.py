@@ -76,7 +76,7 @@ async def async_fetch_data(client, quantity, max_retries=3):
             )
             response.raise_for_status()
             
-            end_time = time.time()
+            end_time = time_module.time()
             elapsed_time = end_time - start_time
 
             logging.info(f"Data fetched successfully in {elapsed_time:.3f} seconds")
