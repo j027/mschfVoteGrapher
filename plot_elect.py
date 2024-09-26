@@ -75,9 +75,12 @@ async def async_fetch_data(client, quantity, max_retries=3):
                 url, params=params, headers=headers, timeout=0.5
             )
             response.raise_for_status()
-            duration = time_module.time() - start_time
-            logging.info(f"Data fetched successfully in {duration:.2f} seconds")
-            return response.json()
+            
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+
+            logging.info(f"Data fetched successfully in {elapsed_time:.3f} seconds")
+            return response.json(), elapsed_time
 
         except httpx.HTTPStatusError as e:
             # Log the basic error message
@@ -95,22 +98,22 @@ async def async_fetch_data(client, quantity, max_retries=3):
                 logging.error(f"Response Headers: {e.response.headers}")
                 logging.error(f"Response Content: {e.response.text}")
 
-            return None
+            return None, 0
         
         except httpx.TimeoutException as e:
             # Handle and log timeouts
             logging.error(f"Timeout error occurred: {e} (Type: {type(e).__name__})")
-            return None
+            return None, 0
 
         except httpx.RequestError as e:
             # Log the basic error message
             logging.error(f"Request error occurred: {e} (Type: {type(e).__name__})")
-            return None
+            return None, 0
 
         except Exception as e:
             # General exception handling for any other errors
             logging.error(f"An unexpected error occurred: {e} (Type: {type(e).__name__})")
-            return None
+            return None, 0
 
 async def async_save_state(data_dict, reset_time):
     reset_time_str = (
@@ -262,20 +265,6 @@ async def main():
     leaderboard_size = 50
     max_leaderboard_size = 12000
 
-    proxies = read_proxies()
-    if not proxies:
-        logging.error("No proxies found. Please ensure 'proxies.txt' contains proxies.")
-        exit(1)  # Exit if no proxies are found
-
-    clients = []
-    clients.append(httpx.AsyncClient(http2=True))
-    for proxy_url in proxies:
-        clients.append(
-            httpx.AsyncClient(
-                http2=True, proxies={"http://": proxy_url, "https://": proxy_url}
-            )
-        )
-
     # Determine the reset time as 2 PM EST, using timezone-aware datetime
     est = ZoneInfo("America/New_York")
     reset_time = get_next_reset_time()
@@ -302,7 +291,7 @@ async def main():
             current_time = datetime.now(est)
 
             # Fetch data using the current client
-            data = await async_fetch_data(clients[client_index], leaderboard_size)
+            data, elapsed_time = await async_fetch_data(clients[client_index], leaderboard_size)
             if data and "players" in data:
                 players = data["players"]
 
@@ -378,8 +367,12 @@ async def main():
             # Increment the client index for the next request
             client_index = (client_index + 1) % len(clients)
 
-            # Wait for the next fetch
-            await asyncio.sleep(fetch_interval)
+            # Calculate the remaining sleep time
+            sleep_time = fetch_interval - elapsed_time
+            if sleep_time > 0:
+                await asyncio.sleep(sleep_time)
+            else:
+                logging.warning(f"Fetch took longer ({elapsed_time:.3f}s) than the fetch interval.")
 
     finally:
         # Save the state before exiting
