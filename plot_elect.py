@@ -263,7 +263,7 @@ def get_next_reset_time():
     return reset_time
 
 async def main():
-    fetch_interval = 0.05  # Fetch data every 0.05 seconds
+    fetch_interval = 1/20  # Fetch data 20 times a second
     client_index = 0
     leaderboard_size = 50
     max_leaderboard_size = 12000
@@ -384,7 +384,7 @@ async def main():
         
         # Close all clients when done
         for client in clients:
-            await client.aclose()
+            await client[0].aclose()
         
         if save_graph_task:
             save_graph_task.cancel()
