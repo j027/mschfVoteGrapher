@@ -32,14 +32,13 @@ if not proxies:
     logging.error("No proxies found. Please ensure 'proxies.txt' contains proxies.")
     exit(1)  # Exit if no proxies are found
 
-# Create a list of HTTPX clients, each using a different proxy
+# Create a list of tuples with HTTPX clients and their associated proxy URLs
 clients = []
 for proxy_url in proxies:
-    clients.append(
-        httpx.AsyncClient(
-            http2=True, proxies={"http://": proxy_url, "https://": proxy_url}
-        )
+    client = httpx.AsyncClient(
+        http2=True, proxies={"http://": proxy_url, "https://": proxy_url}
     )
+    clients.append((client, proxy_url))  # Store the tuple (client, proxy_url)
 
 user_agent = UserAgent()  # Initialize UserAgent object
 
@@ -54,7 +53,7 @@ lock = asyncio.Lock()
 executor = ThreadPoolExecutor(max_workers=1)
 JSON_STATE_FILE = "elect_leaderboard_state.json"  # New filename for "elect" votes
 
-async def async_fetch_data(client, quantity, max_retries=3):
+async def async_fetch_data(client, proxy_url, quantity, max_retries=3):
     url = "https://irk0p9p6ig.execute-api.us-east-1.amazonaws.com/prod/players"
     params = {
         "type": "elect",  # Update to "elect" type
@@ -66,6 +65,10 @@ async def async_fetch_data(client, quantity, max_retries=3):
     for attempt in range(max_retries):
         try:
             headers = {"User-Agent": user_agent.random}
+
+            # Log the proxy URL being used
+            logging.info(f"Using proxy: {proxy_url}")
+
             start_time = time_module.time()
             logging.info(
                 f"Attempting to fetch data (Attempt {attempt + 1}) with quantity: {quantity}..."
@@ -291,7 +294,8 @@ async def main():
             current_time = datetime.now(est)
 
             # Fetch data using the current client
-            data, elapsed_time = await async_fetch_data(clients[client_index], leaderboard_size)
+            client, proxy_url = clients[client_index]
+            data, elapsed_time = await async_fetch_data(client, proxy_url, leaderboard_size)
             if data and "players" in data:
                 players = data["players"]
 
