@@ -376,7 +376,7 @@ async def main():
             if sleep_time > 0:
                 await asyncio.sleep(sleep_time)
             else:
-                logging.warning(f"Fetch took longer ({elapsed_time:.3f}s) than the fetch interval.")
+                logging.info(f"Fetch took longer ({elapsed_time:.3f}s) than the fetch interval.")
 
     finally:
         # Save the state before exiting
