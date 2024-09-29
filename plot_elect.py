@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 # Set up logging configuration with milliseconds
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
@@ -303,7 +303,7 @@ async def main():
                     all_zero_scores = all(player["score"] == 0 for player in players)
 
                     if all_zero_scores:
-                        logging.info(
+                        logging.warning(
                             "Detected leaderboard reset. Saving data and preparing for next reset period."
                         )
 
