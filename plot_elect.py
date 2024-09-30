@@ -75,7 +75,7 @@ async def async_fetch_data(client, proxy_url, quantity, max_retries=3):
             )
 
             response = await client.get(
-                url, params=params, headers=headers, timeout=0.25
+                url, params=params, headers=headers, timeout=0.5
             )
             response.raise_for_status()
             
