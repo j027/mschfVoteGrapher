@@ -105,17 +105,17 @@ async def async_fetch_data(client, proxy_url, quantity, max_retries=3):
         
         except httpx.TimeoutException as e:
             # Handle and log timeouts
-            logging.error(f"Timeout error occurred: {e} (Type: {type(e).__name__})")
+            logging.error(f"Timeout error occurred: {e} (Type: {type(e).__name__}) with proxy {proxy_url}")
             return None, 0
 
         except httpx.RequestError as e:
             # Log the basic error message
-            logging.error(f"Request error occurred: {e} (Type: {type(e).__name__})")
+            logging.error(f"Request error occurred: {e} (Type: {type(e).__name__}) with proxy {proxy_url}")
             return None, 0
 
         except Exception as e:
             # General exception handling for any other errors
-            logging.error(f"An unexpected error occurred: {e} (Type: {type(e).__name__})")
+            logging.error(f"An unexpected error occurred: {e} (Type: {type(e).__name__}) with proxy {proxy_url}")
             return None, 0
 
 async def async_save_state(data_dict, reset_time):
