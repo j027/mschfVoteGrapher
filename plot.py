@@ -252,7 +252,7 @@ async def periodic_save_graph(interval, end_of_hour, data_dict):
 
 
 async def main():
-    fetch_interval = 1/20 # Fetch data 20 times a second
+    fetch_interval = 1/30 # Fetch data 30 times a second
     client_index = 0
     leaderboard_size = 50
     max_leaderboard_size = 12000
