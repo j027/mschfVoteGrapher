@@ -230,8 +230,8 @@ def save_graph_sync(reset_time, data_dict):
     )
 
     # Save HTML and PNG files
-    html_file_name = f'player_elect_scores_{reset_time.strftime("%Y%m%d_%H%M%S")}.html'
-    png_file_name = f'player_elect_scores_{reset_time.strftime("%Y%m%d_%H%M%S")}.png'
+    html_file_name = f'player_elect_scores_{reset_time.strftime("%Y%m%d_%H%M%S_%z")}.html'
+    png_file_name = f'player_elect_scores_{reset_time.strftime("%Y%m%d_%H%M%S_%z")}.png'
 
     # Use the figure's internal save method to export the content
     html_content = fig.to_html(include_plotlyjs="cdn")

@@ -2,6 +2,7 @@ import httpx
 import asyncio
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import time
 from fake_useragent import UserAgent
 import logging
@@ -121,9 +122,6 @@ async def async_fetch_data(client, proxy_url, quantity, max_retries=3):
 
 
 async def async_save_state(data_dict, end_of_hour):
-    end_of_hour_str = (
-        end_of_hour.isoformat() if isinstance(end_of_hour, datetime) else end_of_hour
-    )
     state = {
         "data_dict": {
             k: [
@@ -139,7 +137,7 @@ async def async_save_state(data_dict, end_of_hour):
             ]
             for k, v in data_dict.items()
         },
-        "end_of_hour": end_of_hour_str,
+        "end_of_hour": end_of_hour.isoformat(),
     }
 
     async with aiofiles.open(JSON_STATE_FILE, "w") as f:
@@ -155,6 +153,13 @@ def load_state():
         # Convert strings back to datetime objects if necessary
         if isinstance(state["end_of_hour"], str):
             state["end_of_hour"] = datetime.fromisoformat(state["end_of_hour"])
+            
+            # If 'end_of_hour' is naive, make it timezone-aware (e.g., assume EST)
+            if end_of_hour.tzinfo is None:
+                est = ZoneInfo("America/New_York")
+                end_of_hour = end_of_hour.replace(tzinfo=est)
+            
+            state["end_of_hour"] = end_of_hour
         for k, v in state["data_dict"].items():
             state["data_dict"][k] = [
                 {
@@ -167,6 +172,12 @@ def load_state():
                 }
                 for t in v
             ]
+
+            # Handle timezone-naive datetimes in 'time'
+            for entry in state["data_dict"][k]:
+                if entry["time"].tzinfo is None:
+                    entry["time"] = entry["time"].replace(tzinfo=ZoneInfo("America/New_York"))
+                    
         logging.info("State loaded from JSON file.")
         return state
     return None
@@ -234,8 +245,8 @@ def save_graph_sync(end_of_hour, data_dict):
     )
 
    # Save HTML and PNG files
-    html_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.html'
-    png_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S")}.png'
+    html_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S_%z")}.html'
+    png_file_name = f'player_scores_{end_of_hour.strftime("%Y%m%d_%H%M%S_%z")}.png'
 
     # Use the figure's internal save method to export the content
     html_content = fig.to_html(include_plotlyjs="cdn")
@@ -250,6 +261,17 @@ async def periodic_save_graph(interval, end_of_hour, data_dict):
         await async_save_graph(end_of_hour, data_dict)
         await asyncio.sleep(interval)
 
+def get_end_of_hour():
+    # Set the timezone for EST
+    est = ZoneInfo("America/New_York")
+    
+    # Get the current time in EST
+    now_est = datetime.now(est)
+    
+    # Calculate end of the current or next hour in EST
+    end_of_hour = (now_est + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+    return end_of_hour
+
 
 async def main():
     fetch_interval = 1/30 # Fetch data 30 times a second
@@ -257,9 +279,7 @@ async def main():
     leaderboard_size = 50
     max_leaderboard_size = 12000
 
-    end_of_hour = (datetime.now() + timedelta(hours=1)).replace(
-        minute=0, second=0, microsecond=0
-    )
+    end_of_hour = get_end_of_hour()
 
     # Load saved state if it exists and is still valid
     saved_state = load_state()
