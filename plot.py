@@ -155,11 +155,10 @@ def load_state():
             state["end_of_hour"] = datetime.fromisoformat(state["end_of_hour"])
             
             # If 'end_of_hour' is naive, make it timezone-aware (e.g., assume EST)
-            if end_of_hour.tzinfo is None:
+            if state["end_of_hour"].tzinfo is None:
                 est = ZoneInfo("America/New_York")
-                end_of_hour = end_of_hour.replace(tzinfo=est)
+                state["end_of_hour"] = state["end_of_hour"].replace(tzinfo=est)
             
-            state["end_of_hour"] = end_of_hour
         for k, v in state["data_dict"].items():
             state["data_dict"][k] = [
                 {
@@ -282,6 +281,7 @@ async def main():
     leaderboard_size = 50
     max_leaderboard_size = 12000
 
+    est = ZoneInfo("America/New_York")
     total_elapsed_time = 0  # To track total fetch time in seconds
     successful_fetches = 0  # To count the number of successful fetches
     end_of_hour = get_end_of_hour()
@@ -307,7 +307,7 @@ async def main():
 
     try:
         while True:
-            current_time = datetime.now()
+            current_time = datetime.now(est)
 
             # Fetch data using the current client
             client, proxy_url = clients[client_index]
