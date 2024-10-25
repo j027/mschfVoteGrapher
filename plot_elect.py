@@ -83,7 +83,7 @@ async def async_fetch_data(client, proxy_url, quantity, max_retries=3):
             elapsed_time = end_time - start_time
 
             logging.info(f"Data fetched successfully in {elapsed_time:.3f} seconds")
-            return response.json(), elapsed_time
+            return response.json(), elapsed_time, True
 
         except httpx.HTTPStatusError as e:
             # Log the basic error message
@@ -101,22 +101,22 @@ async def async_fetch_data(client, proxy_url, quantity, max_retries=3):
                 logging.error(f"Response Headers: {e.response.headers}")
                 logging.error(f"Response Content: {e.response.text}")
 
-            return None, 0
+            return None, 0, False
         
         except httpx.TimeoutException as e:
             # Handle and log timeouts
             logging.error(f"Timeout error occurred: {e} (Type: {type(e).__name__}) with proxy {proxy_url}")
-            return None, 0
+            return None, 0, False
 
         except httpx.RequestError as e:
             # Log the basic error message
             logging.error(f"Request error occurred: {e} (Type: {type(e).__name__}) with proxy {proxy_url}")
-            return None, 0
+            return None, 0, False
 
         except Exception as e:
             # General exception handling for any other errors
             logging.error(f"An unexpected error occurred: {e} (Type: {type(e).__name__}) with proxy {proxy_url}")
-            return None, 0
+            return None, 0, False
 
 async def async_save_state(data_dict, reset_time):
     reset_time_str = (
@@ -273,6 +273,8 @@ async def main():
 
     # Determine the reset time as 2 PM EST, using timezone-aware datetime
     est = ZoneInfo("America/New_York")
+    total_elapsed_time = 0  # To track total fetch time in seconds
+    successful_fetches = 0  # To count the number of successful fetches
     reset_time = get_next_reset_time()
 
     # Load saved state if it exists and is still valid
@@ -298,7 +300,14 @@ async def main():
 
             # Fetch data using the current client
             client, proxy_url = clients[client_index]
-            data, elapsed_time = await async_fetch_data(client, proxy_url, leaderboard_size)
+            data, elapsed_time, success = await async_fetch_data(client, proxy_url, leaderboard_size)
+
+            # Update average fetch time tracking
+            if success:
+                total_elapsed_time += elapsed_time
+                successful_fetches += 1
+
+
             if data and "players" in data:
                 players = data["players"]
 
@@ -306,9 +315,15 @@ async def main():
                     all_zero_scores = all(player["score"] == 0 for player in players)
 
                     if all_zero_scores:
-                        logging.warning(
-                            "Detected leaderboard reset. Saving data and preparing for next reset period."
-                        )
+                        if total_elapsed_time > 0:
+                            fetches_per_second = successful_fetches / total_elapsed_time
+                            logging.warning(f"Average fetch rate for the round: {fetches_per_second:.3f} fetches/second")
+                        else:
+                            logging.warning("No successful fetches this round.")
+
+                         # Reset the tracking variables for the next hour
+                        total_elapsed_time = 0
+                        successful_fetches = 0
 
                         # Save the current data before moving to the next reset
                         await async_save_graph(reset_time, data_dict)
