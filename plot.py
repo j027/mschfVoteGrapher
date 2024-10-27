@@ -303,17 +303,16 @@ async def main():
 
     try:
         while True:
-            current_time = datetime.now(est)
-
             # Fetch data using the current client
             client, proxy_url = clients[client_index]
             data, elapsed_time, success = await async_fetch_data(client, proxy_url, leaderboard_size)
+
+            current_time = datetime.now(est)
 
             # Update average fetch time tracking
             if success:
                 total_elapsed_time += elapsed_time
                 successful_fetches += 1
-
 
             if data and "players" in data:
                 players = data["players"]
@@ -329,7 +328,7 @@ async def main():
                         else:
                             logging.warning("No successful fetches this round.")
 
-                         # Reset the tracking variables for the next hour
+                        # Reset the tracking variables for the next hour
                         total_elapsed_time = 0
                         successful_fetches = 0
 
@@ -357,7 +356,6 @@ async def main():
                             os.remove(JSON_STATE_FILE)
 
                         continue
-
 
                 # Check last score, to increase leaderboard size as needed
                 last_score = players[-1]["score"] if players else None
@@ -409,11 +407,11 @@ async def main():
     finally:
         # Save the state before exiting
         await async_save_state(data_dict, end_of_hour)
-        
+
         # Close all clients when done
         for client in clients:
             await client[0].aclose()
-        
+
         if save_graph_task:
             save_graph_task.cancel()
 

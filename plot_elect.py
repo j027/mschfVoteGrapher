@@ -264,8 +264,9 @@ def get_next_reset_time():
 async def main():
     fetch_interval = 1/30 # Fetch data 30 times a second
     client_index = 0
-    leaderboard_size = 50
+    leaderboard_size = 1000
     max_leaderboard_size = 12000
+    previous_players_set = set()
 
     # Determine the reset time as 2 PM EST, using timezone-aware datetime
     est = ZoneInfo("America/New_York")
@@ -285,24 +286,23 @@ async def main():
 
         data_dict = {}
         logging.info("No valid previous state found or new reset period started. Starting fresh.")
-    
+
     # Start periodic saving
     save_interval = 20  # Save graph every 20 seconds
     save_graph_task = asyncio.create_task(periodic_save_graph(save_interval, reset_time, data_dict))
 
     try:
         while True:
-            current_time = datetime.now(est)
-
             # Fetch data using the current client
             client, proxy_url = clients[client_index]
             data, elapsed_time, success = await async_fetch_data(client, proxy_url, leaderboard_size)
+
+            current_time = datetime.now(est)
 
             # Update average fetch time tracking
             if success:
                 total_elapsed_time += elapsed_time
                 successful_fetches += 1
-
 
             if data and "players" in data:
                 players = data["players"]
@@ -317,7 +317,7 @@ async def main():
                         else:
                             logging.warning("No successful fetches this round.")
 
-                         # Reset the tracking variables for the next hour
+                        # Reset the tracking variables for the next hour
                         total_elapsed_time = 0
                         successful_fetches = 0
 
@@ -329,7 +329,7 @@ async def main():
                         data_dict = {}
 
                         # Reset the leaderboard size for the next period
-                        leaderboard_size = 50
+                        leaderboard_size = 1000
 
                         # Calculate the reset time for the next day at 2 PM EST
                         next_midnight = datetime.combine(current_time.date(), time.min, est)
@@ -356,6 +356,25 @@ async def main():
                     logging.info(
                         f"Leaderboard size increased to {leaderboard_size} for next fetch."
                     )
+
+                # Get the current set of player usernames
+                current_players_set = {player.get("username") for player in players}
+
+                # Identify disappeared players
+                disappeared_players = previous_players_set - current_players_set
+
+                # Handle disappeared players by setting their score to 0
+                for disappeared_player in disappeared_players:
+                    if disappeared_player not in data_dict:
+                        data_dict[disappeared_player] = []
+
+                    data_dict[disappeared_player].append(
+                        {"time": current_time, "score": 0}
+                    )
+                    logging.warning(f"Player '{disappeared_player}' disappeared; setting score to 0.")
+
+                # Update the set of previously seen players
+                previous_players_set = current_players_set
 
                 # Tracking changes in score
                 for player in players:
@@ -395,11 +414,11 @@ async def main():
     finally:
         # Save the state before exiting
         await async_save_state(data_dict, reset_time)
-        
+
         # Close all clients when done
         for client in clients:
             await client[0].aclose()
-        
+
         if save_graph_task:
             save_graph_task.cancel()
 
