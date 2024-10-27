@@ -229,12 +229,8 @@ def save_graph_sync(reset_time, data_dict):
         hovermode="x"
     )
 
-    # Get the UTC equivalent of reset_time
-    reset_time_utc = reset_time.astimezone(ZoneInfo("UTC"))
-
-    # Update filename formatting to include both local timezone offset and UTC timestamp
-    html_file_name = f'player_elect_scores_{reset_time.strftime("%Y%m%d_%H%M%S_%z")}_UTC{reset_time_utc.strftime("%Y%m%d_%H%M%S")}.html'
-    png_file_name = f'player_elect_scores_{reset_time.strftime("%Y%m%d_%H%M%S_%z")}_UTC{reset_time_utc.strftime("%Y%m%d_%H%M%S")}.png'
+    html_file_name = f'player_elect_scores_{reset_time.strftime("%Y%m%d_%H%M%S_%z")}.html'
+    png_file_name = f'player_elect_scores_{reset_time.strftime("%Y%m%d_%H%M%S_%z")}.png'
 
     # Use the figure's internal save method to export the content
     html_content = fig.to_html(include_plotlyjs="cdn")
